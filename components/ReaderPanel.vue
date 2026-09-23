@@ -7,6 +7,9 @@ interface Message {
   content: string
   meanings?: Record<string, string>
   chunks?: string[]      // set on "ask about selection" questions
+  sent?: { lemma: string; source: string }[]   // words offered to the AI for this reply
+  used?: string[]
+  frontierAt?: number
   side?: boolean         // selection Q&A: shown in chat, not sent as chat history
   error?: boolean
 }
@@ -14,7 +17,7 @@ interface Message {
 const { ask, askAboutSelection } = useClaude()
 const { tokenize, lemmatize } = useLemmatizer()
 const vocab = useVocabDB()
-const { recordExposures, getCandidates, markSent, reconcileSent, computeFrontier, getStats, exportData, importData } = vocab
+const { recordExposures, getCandidates, markSent, reconcileSent, computeEdge, getStats } = vocab
 const { clearKey } = useApiKey()
 const { prefetch } = useTTS()
 const { preload: preloadLlm } = useLocalLLM()
@@ -25,7 +28,7 @@ const input = ref('')
 const loading = ref(false)
 const stats = ref({ tracked: 0, learning: 0, review: 0, due: 0, clicked: 0, total: 0 })
 const targets = ref(new Set<string>())
-const frontier = ref(0)
+const edge = ref(0)
 const chunks = ref<string[]>([])
 const scroller = ref<HTMLElement | null>(null)
 const textarea = ref<HTMLTextAreaElement | null>(null)
@@ -41,9 +44,9 @@ const suggestions = [
 ]
 
 async function refreshWordState() {
-  const [st, fr] = await Promise.all([getStats(), computeFrontier()])
+  const [st, e] = await Promise.all([getStats(), computeEdge()])
   stats.value = st
-  frontier.value = fr.frontier
+  edge.value = e.edge
 }
 
 function scrollToBottom() {
@@ -97,11 +100,19 @@ async function sendText(text: string) {
     scrollToBottom()
     try {
       const cand = await getCandidates()
-      const turn = await markSent(cand.words)
+      const turn = await markSent(cand.words, cand.dueCount)
       const { text: reply, meanings } = await ask(q, priorHistory, {
-        words: cand.words, steer: cand.steer, frontier: cand.frontier, total: vocab.TOTAL_WORDS
+        words: cand.words, steer: cand.steer, frontier: cand.edge, total: vocab.TOTAL_WORDS
       })
-      messages.value.push({ id: nextId++, role: 'assistant', content: reply, meanings })
+      const usedNow = new Set(tokenize(reply).map(t => lemmatize(t)))
+      const usedList = cand.words.filter(l => usedNow.has(l))
+      messages.value.push({
+        id: nextId++, role: 'assistant', content: reply, meanings,
+        sent: cand.items, used: usedList, frontierAt: cand.edge
+      })
+      vocab.saveTurn({ at: Date.now(), question: q, edge: cand.edge,
+                       sent: cand.items, used: usedList,
+                       skipped: cand.words.filter(l => !usedNow.has(l)) })
       lastFailed = null
       loading.value = false
       scrollToBottom()
@@ -228,7 +239,7 @@ onMounted(() => { refreshWordState(); preloadLlm() })
         <div>
           <h1 class="text-base font-bold leading-tight">Vocab Reader</h1>
           <div class="text-[11px] text-slate-500 flex gap-3">
-            <span>frontier <strong class="text-emerald-600">{{ frontier }}</strong>/{{ stats.total }}</span>
+            <span>edge <strong class="text-emerald-600">{{ edge }}</strong>/{{ stats.total }}</span>
             <span>due {{ stats.due }}</span>
             <span>seen {{ stats.tracked }}</span>
           </div>
@@ -293,6 +304,7 @@ onMounted(() => { refreshWordState(); preloadLlm() })
               />
             </div>
           </div>
+          <TurnWords v-if="m.role === 'assistant' && m.sent" :sent="m.sent" :used="m.used || []" :frontier="m.frontierAt || 0" />
         </template>
 
         <!-- typing indicator -->

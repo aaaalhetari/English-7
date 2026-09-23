@@ -59,33 +59,43 @@ automatically from your repository name.
 
 ## How the learning loop works
 
-1. **Curriculum**: a fixed list of 9,000 words ordered by frequency. The AI
-   never reorders it.
-2. **Scheduling**: [FSRS](https://github.com/open-spaced-repetition/ts-fsrs)
-   (the algorithm behind modern Anki) holds a card per word.
-3. **Evidence**: a word appearing in a reply without a tap is weak evidence —
-   several spaced views (default 3, minimum 6h apart) add up to one "I knew it".
-   A tap is strong, immediate evidence of "not known yet".
-4. **Frontier**: your position in the list. It advances band by band, and only
-   when a band passes *two* tests: enough of it has actually been shown to you
-   (coverage) and enough of what was shown looks known (mastery, estimated with
-   a Beta(1,1) posterior so a couple of lucky words cannot pass a band). It
-   never moves backwards — forgetting is handled by review scheduling.
-5. **Candidates**: each reply is sent with up to 50 words — reviews that are
-   due, gaps below the frontier that were never shown, new words just past it,
-   plus a few **random probes** from the whole list so the estimate cannot
-   drift with your reading habits.
-6. **Difficulty**: the frontier is written into the prompt, so the reply itself
-   gets harder as you progress.
-7. **Skipped words**: words the AI declines to use are rested for a few turns;
-   after several skips the prompt asks it to steer part of its answer toward a
-   subject where they fit naturally. Words are never forced into the text.
+1. **Placement test** (first run): ~30 words spread across the whole list. Tap
+   the ones you do not know. Known words enter the scheduler already in review,
+   unknown ones enter as failed, and your starting edge comes from real data
+   instead of assuming you know nothing.
+2. **Curriculum**: 9,000 words ordered by frequency, never reordered. Words more
+   common than rank 300 (`the`, `do`, `not`) are not tracked at all.
+3. **Scheduling**: [FSRS](https://github.com/open-spaced-repetition/ts-fsrs) holds
+   one card per word (new → learning → review → relearning).
+4. **Evidence**: a tap means "not known" immediately. Silent reading counts only
+   when spaced out — three views for new words (6h apart by default), and for
+   words already in review, a view only counts once half of their scheduled
+   interval has passed, so common words cannot drift years into the future.
+5. **The edge**: the rank below which 95% of the words currently in review sit.
+   It rises as you master words and falls if you start tapping again. Past taps
+   do not matter — only where a word stands today.
+6. **Candidates** (50 per reply): reviews that are actually due, never before
+   their time, plus at most 10 new words taken from just above the edge. That cap
+   is what keeps most of every text familiar.
+7. **Difficulty**: the edge goes into the prompt, so the reply itself gets harder
+   as you progress. Definition cards are written for the same level.
+8. **Skipped words**: rested after 5 skips; after 15 the prompt may steer the
+   subject toward them, at most 3 per reply.
+
+## Inspecting every turn
+
+Under each reply there is a collapsible line showing how many of the offered
+words the AI actually used. Opening it lists every word grouped by why it was
+sent (due for review, gap below the frontier, new past the frontier, random
+probe, or steering), with unused words faded and struck through.
 
 ## Dashboard
 
 Four tabs: **Progress** (frontier, counts, band-by-band coverage and mastery,
-hardest words, cache sizes), **Words** (search, filter by due/review/tapped,
-mark known, reset), **AI** (words the AI keeps skipping, on-device model
+hardest words, cache sizes), **Words** (the full table: every counter the system keeps
+per word — rank, stage, times seen, taps, streak, times offered, times skipped,
+next review — with search, filters by stage and by why it was sent, sorting on
+any column, CSV export, and a per-word detail view), **AI** (words the AI keeps skipping, on-device model
 picker), **Settings** (voice and repeat, evidence rules, frontier rules,
 conversation and display, export/import) — every control has a one-line
 explanation underneath it.

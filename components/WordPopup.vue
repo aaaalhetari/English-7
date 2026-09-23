@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits(['close'])
 
-const { registerClick, getCard, saveCard, setKnown, getAllWords, getFrontier, TOTAL_WORDS } = useVocabDB()
+const { registerClick, getCard, saveCard, knowItWell, showMoreOften, getAllWords, computeEdge } = useVocabDB()
 const { askWordCard } = useClaude()
 const { define: defineLocal, enabled: localEnabled, option: localOption, loading: localLoading, progress: localProgress, lastMs } = useLocalLLM()
 const { speak, downloading, downloadProgress } = useTTS()
@@ -34,8 +34,8 @@ const dict = dictionaryData as Record<string, string>
 // The explanation is written for the reader's position in the list, and kept
 // a little simpler than the word itself.
 async function currentLevel() {
-  const f = await getFrontier()
-  return `someone who knows the ${Math.max(500, f)} most common English words`
+  const { edge } = await computeEdge()
+  return `someone who knows the ${Math.max(500, edge)} most common English words`
 }
 
 async function resolve() {
@@ -96,10 +96,13 @@ async function resolve() {
 }
 
 async function markKnown() {
-  await setKnown(props.word, true)
+  await knowItWell(props.word)      // pushes the next review further out
   emit('close')
 }
-function keepStudying() { emit('close') }
+async function wantMore() {
+  await showMoreOften(props.word)   // brings it back soon, without counting as a failure
+  emit('close')
+}
 
 onMounted(resolve)
 </script>
@@ -111,7 +114,7 @@ onMounted(resolve)
         <div>
           <h3 class="font-bold text-xl">{{ word }}</h3>
           <p v-if="info" class="text-[11px] text-slate-400">
-            rank {{ info.freq_rank }} · seen {{ info.seen }} · taps {{ info.clicks }}
+            rank {{ info.freq_rank }} · seen {{ info.seen }} ({{ info.counted }} counted) · taps {{ info.clicks }}
           </p>
         </div>
         <button class="text-slate-500 text-sm border border-slate-200 rounded-lg px-3 py-1.5" @click="speak(word)">
@@ -134,8 +137,8 @@ onMounted(resolve)
       </template>
 
       <div class="flex gap-2 mt-5">
-        <button class="flex-1 bg-slate-100 rounded-lg py-2 text-sm" @click="markKnown">I know this now</button>
-        <button class="flex-1 bg-emerald-600 text-white rounded-lg py-2 text-sm" @click="keepStudying">Keep studying</button>
+        <button class="flex-1 bg-slate-100 rounded-lg py-2 text-sm" @click="markKnown">I know it well</button>
+        <button class="flex-1 bg-emerald-600 text-white rounded-lg py-2 text-sm" @click="wantMore">Show it more often</button>
       </div>
       <button class="mt-2 w-full text-slate-400 text-sm py-1" @click="emit('close')">Close</button>
     </div>
