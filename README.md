@@ -59,28 +59,28 @@ automatically from your repository name.
 
 ## How the learning loop works
 
-1. **Placement test** (first run): ~30 words spread across the whole list. Tap
-   the ones you do not know. Known words enter the scheduler already in review,
-   unknown ones enter as failed, and your starting edge comes from real data
-   instead of assuming you know nothing.
-2. **Curriculum**: 9,000 words ordered by frequency, never reordered. Words more
-   common than rank 300 (`the`, `do`, `not`) are not tracked at all.
-3. **Scheduling**: [FSRS](https://github.com/open-spaced-repetition/ts-fsrs) holds
-   one card per word (new → learning → review → relearning).
-4. **Evidence**: a tap means "not known" immediately. Silent reading counts only
-   when spaced out — three views for new words (6h apart by default), and for
-   words already in review, a view only counts once half of their scheduled
-   interval has passed, so common words cannot drift years into the future.
-5. **The edge**: the rank below which 95% of the words currently in review sit.
-   It rises as you master words and falls if you start tapping again. Past taps
-   do not matter — only where a word stands today.
-6. **Candidates** (50 per reply): reviews that are actually due, never before
-   their time, plus at most 10 new words taken from just above the edge. That cap
-   is what keeps most of every text familiar.
-7. **Difficulty**: the edge goes into the prompt, so the reply itself gets harder
-   as you progress. Definition cards are written for the same level.
-8. **Skipped words**: rested after 5 skips; after 15 the prompt may steer the
-   subject toward them, at most 3 per reply.
+**One gate for every word.** A word enters the scheduler (FSRS) only after it
+has appeared in replies 8 times, at least 24h apart, without a tap. A tap
+enters it immediately as "not known", wherever it sits, and resets its count.
+- Below the edge: passing the gate enters the scheduler at once, no limit.
+- Above the edge: at most 10 such entries per day, most frequent first; the
+  rest wait in a queue.
+
+**The edge** is the rank below which 98% of the words currently in review sit.
+Until 30 words reach review, the placement test result is used instead.
+
+**Placement test** (first run, measure only): 5 words far apart find your area,
+then 20 around it pin it down. Nothing enters the scheduler. The starting edge
+is the last known word before the first real unknown one.
+
+**What is sent to the AI, in strict order:**
+1. Scheduler reviews that are due (oldest first).
+2. Gaps below the edge: words shown before but still collecting views, then
+   words never shown.
+3. New words above the edge, 10 per day (counted on words that actually
+   appeared) — only once steps 1 and 2 have nothing left unshown.
+
+**History:** only the last 2 exchanges are re-sent with each question.
 
 ## Inspecting every turn
 

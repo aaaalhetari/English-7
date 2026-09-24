@@ -13,6 +13,8 @@
     "@pinia/nuxt": "^0.5.5",
     "@vueuse/core": "^11.0.0",
     "@vueuse/nuxt": "^11.0.0",
+    "ag-grid-community": "^36.2.0",
+    "ag-grid-vue3": "^36.2.0",
     "dexie": "^4.0.8",
     "kokoro-js": "^1.2.1",
     "nuxt": "^3.13.0",
